@@ -16,11 +16,14 @@ namespace RestaurantPOS.Web.Controllers
         [HttpGet]
         public IActionResult Login()
         {
-            // If already logged in, go to POS
             var waiterId = HttpContext.Session.GetString(SessionKeys.WaiterId);
             if (!string.IsNullOrWhiteSpace(waiterId))
             {
-                return RedirectToAction("Index", "Pos");
+                // If already logged in, send based on role
+                var isManager = HttpContext.Session.GetString(SessionKeys.IsManager) == "1";
+                return isManager
+                    ? RedirectToAction("Index", "Home")
+                    : RedirectToAction("Index", "Pos");
             }
 
             return View();
@@ -28,7 +31,7 @@ namespace RestaurantPOS.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Login(string pin)
+        public IActionResult Login(string pin, string mode) // mode = "waiter" or "manager"
         {
             if (string.IsNullOrWhiteSpace(pin))
             {
@@ -36,17 +39,27 @@ namespace RestaurantPOS.Web.Controllers
                 return View();
             }
 
-            var waiter = _waiterService.LoginWithPin(pin);
-            if (waiter == null)
+            mode = (mode ?? "waiter").Trim().ToLower();
+
+            var user = mode == "manager"
+                ? _waiterService.LoginManagerWithPin(pin)
+                : _waiterService.LoginWithPin(pin);
+
+            if (user == null)
             {
-                TempData["Error"] = "Invalid PIN.";
+                TempData["Error"] = mode == "manager"
+                    ? "Invalid manager PIN."
+                    : "Invalid waiter PIN.";
                 return View();
             }
 
-            HttpContext.Session.SetString(SessionKeys.WaiterId, waiter.Id.ToString());
-            HttpContext.Session.SetString(SessionKeys.WaiterName, waiter.FullName);
+            HttpContext.Session.SetString(SessionKeys.WaiterId, user.Id.ToString());
+            HttpContext.Session.SetString(SessionKeys.WaiterName, user.FullName);
+            HttpContext.Session.SetString(SessionKeys.IsManager, user.IsManager ? "1" : "0");
 
-            return RedirectToAction("Index", "Pos");
+            return user.IsManager
+                ? RedirectToAction("Index", "Home")
+                : RedirectToAction("Index", "Pos");
         }
 
         [HttpGet]

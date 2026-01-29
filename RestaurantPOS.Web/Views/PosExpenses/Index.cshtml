@@ -1,0 +1,47 @@
+@model IEnumerable<RestaurantPOS.Domain.Entities.Expense>
+
+@{
+    ViewData["Title"] = "POS Expenses";
+    Layout = "_PosLayout";
+}
+
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">Expenses</h2>
+            <div class="text-muted">Quick POS entry</div>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="ti ti-plus"></i>
+                Add expense
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th class="text-end">Amount (MKD)</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var e in Model)
+            {
+                <tr>
+                    <td>@e.Date.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                    <td>@e.Description</td>
+                    <td>@(string.IsNullOrWhiteSpace(e.Type) ? "Other" : e.Type)</td>
+                    <td class="text-end fw-bold">@e.Amount</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,37 +1,49 @@
 using Microsoft.EntityFrameworkCore;
-using RestaurantPOS.Domain.Enums;
-using RestaurantPOS.Web.Data;
 using RestaurantPOS.Domain.Entities;
+using RestaurantPOS.Domain.Enums;
 using RestaurantPOS.Repository.Data;
 
 namespace RestaurantPOS.Web.Data
 {
     public static class DbSeeder
     {
-        // Change these whenever you want
         private const string MainWaiterName = "Main Waiter";
         private const string MainWaiterPin = "1111";
 
+        // NEW manager
+        private const string ManagerName = "Manager";
+        private const string ManagerPin = "9999";
+
         public static async Task SeedAsync(ApplicationDbContext db)
         {
-            // Ensure DB schema is applied
             await db.Database.MigrateAsync();
 
-            // Seed main waiter if none exist
+            // Waiters (ensure at least 1 waiter + 1 manager)
             if (!await db.Waiters.AnyAsync())
             {
-                db.Waiters.Add(new Waiter
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = MainWaiterName,
-                    PinCode = MainWaiterPin,
-                    IsActive = true
-                });
+                db.Waiters.AddRange(
+                    new Waiter
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = MainWaiterName,
+                        PinCode = MainWaiterPin,
+                        IsActive = true,
+                        IsManager = false
+                    },
+                    new Waiter
+                    {
+                        Id = Guid.NewGuid(),
+                        FullName = ManagerName,
+                        PinCode = ManagerPin,
+                        IsActive = true,
+                        IsManager = true
+                    }
+                );
 
                 await db.SaveChangesAsync();
             }
 
-            // Seed tables if none exist
+            // Tables
             if (!await db.RestaurantTables.AnyAsync())
             {
                 for (int i = 1; i <= 15; i++)
@@ -47,12 +59,45 @@ namespace RestaurantPOS.Web.Data
                 await db.SaveChangesAsync();
             }
 
-            // Seed categories if none exist
+            // Categories (expanded)
             if (!await db.ProductCategories.AnyAsync())
             {
                 db.ProductCategories.AddRange(
-                    new ProductCategory { Id = Guid.NewGuid(), Name = "Drinks" },
-                    new ProductCategory { Id = Guid.NewGuid(), Name = "Food" }
+                    new ProductCategory { Id = Guid.NewGuid(), Name = "Drinks", DisplayOrder = 1 },
+                    new ProductCategory { Id = Guid.NewGuid(), Name = "Food", DisplayOrder = 2 },
+                    new ProductCategory { Id = Guid.NewGuid(), Name = "Desserts", DisplayOrder = 3 },
+                    new ProductCategory { Id = Guid.NewGuid(), Name = "Coffee", DisplayOrder = 4 }
+                );
+
+                await db.SaveChangesAsync();
+            }
+
+            // Products (starter pack)
+            if (!await db.Products.AnyAsync())
+            {
+                var categories = await db.ProductCategories.ToListAsync();
+
+                Guid CatId(string name) =>
+                    categories.First(c => c.Name == name).Id;
+
+                db.Products.AddRange(
+                    // Drinks
+                    new Product { Id = Guid.NewGuid(), Name = "Coca-Cola", ProductCategoryId = CatId("Drinks"), Price = 80, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Fanta", ProductCategoryId = CatId("Drinks"), Price = 80, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Water", ProductCategoryId = CatId("Drinks"), Price = 50, IsAvailable = true },
+
+                    // Coffee
+                    new Product { Id = Guid.NewGuid(), Name = "Espresso", ProductCategoryId = CatId("Coffee"), Price = 70, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Cappuccino", ProductCategoryId = CatId("Coffee"), Price = 90, IsAvailable = true },
+
+                    // Food
+                    new Product { Id = Guid.NewGuid(), Name = "Chicken Burger", ProductCategoryId = CatId("Food"), Price = 220, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Cheeseburger", ProductCategoryId = CatId("Food"), Price = 240, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Greek Salad", ProductCategoryId = CatId("Food"), Price = 180, IsAvailable = true },
+
+                    // Desserts
+                    new Product { Id = Guid.NewGuid(), Name = "Cheesecake", ProductCategoryId = CatId("Desserts"), Price = 150, IsAvailable = true },
+                    new Product { Id = Guid.NewGuid(), Name = "Chocolate Cake", ProductCategoryId = CatId("Desserts"), Price = 160, IsAvailable = true }
                 );
 
                 await db.SaveChangesAsync();

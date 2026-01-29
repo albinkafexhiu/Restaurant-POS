@@ -5,10 +5,17 @@ namespace RestaurantPOS.Web.Models
     public class OrderItemDisplay
     {
         public Guid OrderItemId { get; set; }
+        public Guid ProductId { get; set; }   
         public string ProductName { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public int UnitPrice { get; set; }
         public int LineTotal { get; set; }
+    }
+
+    public class CategoryFilterItem
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
     }
 
     public class OrderDetailsViewModel
@@ -21,13 +28,27 @@ namespace RestaurantPOS.Web.Models
 
         public List<OrderItemDisplay> Items { get; set; } = new();
         public List<RestaurantPOS.Domain.Entities.Product> Products { get; set; } = new();
-        public List<SelectListItem> Waiters { get; set; } = new();
 
-        // Form fields
-        public Guid SelectedWaiterId { get; set; }
-        public Guid SelectedProductId { get; set; }
-        public int Quantity { get; set; } = 1;
+        public List<CategoryFilterItem> Categories { get; set; } = new();
 
         public int Total { get; set; }
+    }
+
+
+    public class PosTableCardViewModel
+    {
+        public Guid TableId { get; set; }
+        public int TableNumber { get; set; }
+        public string StatusText { get; set; } = "Free";
+        public string StatusBadgeClass { get; set; } = "bg-success-lt";
+        public bool HasOpenOrder { get; set; }
+        public Guid? OpenOrderId { get; set; }
+        public int RunningTotal { get; set; }
+        public int ItemsCount { get; set; }
+    }
+
+    public class PosTablesViewModel
+    {
+        public List<PosTableCardViewModel> Tables { get; set; } = new();
     }
 }

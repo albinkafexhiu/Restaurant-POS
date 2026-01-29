@@ -1,12 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
 using RestaurantPOS.Domain.Entities;
 using RestaurantPOS.Domain.Enums;
 using RestaurantPOS.Service.Interfaces;
-using RestaurantPOS.Web.Models;
 using RestaurantPOS.Web.Infrastructure;
+using RestaurantPOS.Web.Models;
 using System.Text;
-
 
 namespace RestaurantPOS.Web.Controllers
 {
@@ -16,35 +14,64 @@ namespace RestaurantPOS.Web.Controllers
         private readonly ITableService _tableService;
         private readonly IOrderService _orderService;
         private readonly IProductService _productService;
+        private readonly IProductCategoryService _categoryService;
         private readonly IWaiterService _waiterService;
 
         public PosController(
             ITableService tableService,
             IOrderService orderService,
             IProductService productService,
+            IProductCategoryService categoryService,
             IWaiterService waiterService)
         {
             _tableService = tableService;
             _orderService = orderService;
             _productService = productService;
+            _categoryService = categoryService;
             _waiterService = waiterService;
         }
 
-        // Show tables for POS usage
+        // POS tables grid (3B enhanced)
         public IActionResult Index()
         {
-            var tables = _tableService.GetAll();
-            return View(tables);
+            var tables = _tableService.GetAll().OrderBy(t => t.TableNumber).ToList();
+
+            var vm = new PosTablesViewModel();
+
+            foreach (var t in tables)
+            {
+                var open = _orderService.GetOpenOrderForTable(t.Id);
+                var itemsCount = 0;
+                var runningTotal = 0;
+
+                if (open != null)
+                {
+                    var items = _orderService.GetItemsForOrder(open.Id).ToList();
+                    itemsCount = items.Sum(x => x.Quantity);
+                    runningTotal = items.Sum(x => x.LineTotal);
+                }
+
+                vm.Tables.Add(new PosTableCardViewModel
+                {
+                    TableId = t.Id,
+                    TableNumber = t.TableNumber,
+                    StatusText = t.Status.ToString(),
+                    StatusBadgeClass = GetTableBadgeClass(t.Status),
+                    HasOpenOrder = open != null,
+                    OpenOrderId = open?.Id,
+                    ItemsCount = itemsCount,
+                    RunningTotal = runningTotal
+                });
+            }
+
+            return View(vm);
         }
 
-        // Show POS screen for a specific table
         public IActionResult Table(Guid id)
         {
             var table = _tableService.GetById(id);
             if (table == null)
-            {
                 return NotFound();
-            }
 
             var vm = BuildOrderViewModel(table);
             return View(vm);
@@ -52,12 +79,11 @@ namespace RestaurantPOS.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult StartOrder(Guid tableId, Guid waiterId)
+        public IActionResult StartOrder(Guid tableId)
         {
-            if (waiterId == Guid.Empty)
-            {
-                return RedirectToAction("Table", new { id = tableId });
-            }
+            var waiterIdStr = HttpContext.Session.GetString(SessionKeys.WaiterId);
+            if (string.IsNullOrWhiteSpace(waiterIdStr) || !Guid.TryParse(waiterIdStr, out var waiterId))
+                return RedirectToAction("Login", "Auth");
 
             _orderService.OpenOrderForTable(tableId, waiterId);
 
@@ -69,50 +95,65 @@ namespace RestaurantPOS.Web.Controllers
         public IActionResult AddItem(Guid tableId, Guid orderId, Guid productId, int quantity)
         {
             if (orderId == Guid.Empty || productId == Guid.Empty || quantity <= 0)
-            {
                 return RedirectToAction("Table", new { id = tableId });
-            }
 
             _orderService.AddItem(orderId, productId, quantity);
 
             return RedirectToAction("Table", new { id = tableId });
         }
 
+        // 3B: Remove now decrements in service
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult RemoveItem(Guid tableId, Guid orderItemId)
         {
-            _orderService.RemoveItem(orderItemId);
+            if (orderItemId != Guid.Empty)
+                _orderService.RemoveItem(orderItemId);
 
             return RedirectToAction("Table", new { id = tableId });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult CloseOrder(Guid tableId, Guid orderId, PaymentMethod paymentMethod)
+        public IActionResult CancelOrder(Guid tableId, Guid orderId)
+        {
+            if (orderId == Guid.Empty)
+                return RedirectToAction("Table", new { id = tableId });
+
+            _orderService.CancelOrder(orderId);
+
+            TempData["Success"] = "Order cancelled. Table is free.";
+            return RedirectToAction("Index");
+        }
+
+        // user-initiated download: POST + iframe target
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult PrintReceipt(Guid tableId, Guid orderId, PaymentMethod paymentMethod)
         {
             if (orderId == Guid.Empty)
                 return RedirectToAction("Index");
 
+            var items = _orderService.GetItemsForOrder(orderId).ToList();
+            if (!items.Any())
+            {
+                TempData["Error"] = "Cannot print receipt for an empty order. Add items or cancel the order.";
+                return RedirectToAction("Table", new { id = tableId });
+            }
+
             _orderService.CloseOrder(orderId, paymentMethod);
 
-            // auto-download receipt after closing
-            return RedirectToAction("ReceiptTxt", new { tableId = tableId, orderId = orderId });
+            return BuildReceiptFile(tableId, orderId);
         }
 
-        
-        [HttpGet]
-        public IActionResult ReceiptTxt(Guid tableId, Guid orderId)
+        private FileResult BuildReceiptFile(Guid tableId, Guid orderId)
         {
-            if (orderId == Guid.Empty)
-                return RedirectToAction("Table", new { id = tableId });
-
             var order = _orderService.GetById(orderId);
-            if (order == null)
-                return RedirectToAction("Table", new { id = tableId });
-
             var table = _tableService.GetById(tableId);
-            var waiter = _waiterService.GetById(order.WaiterId);
+
+            Waiter? waiter = null;
+            if (order != null)
+                waiter = _waiterService.GetById(order.WaiterId);
 
             var products = _productService.GetAll().ToList();
             var items = _orderService.GetItemsForOrder(orderId).ToList();
@@ -123,26 +164,31 @@ namespace RestaurantPOS.Web.Controllers
             sb.AppendLine("--------------------------------");
             sb.AppendLine($"Table: {(table != null ? table.TableNumber.ToString() : "N/A")}");
             sb.AppendLine($"Waiter: {waiter?.FullName ?? "N/A"}");
-            sb.AppendLine($"Opened: {order.OpenedAt:yyyy-MM-dd HH:mm}");
-            if (order.ClosedAt.HasValue)
-                sb.AppendLine($"Closed: {order.ClosedAt.Value:yyyy-MM-dd HH:mm}");
-            sb.AppendLine($"Status: {order.Status}");
-            sb.AppendLine($"Payment: {order.PaymentMethod}");
+
+            if (order != null)
+            {
+                sb.AppendLine($"Opened: {order.OpenedAt:yyyy-MM-dd HH:mm}");
+                if (order.ClosedAt.HasValue)
+                    sb.AppendLine($"Closed: {order.ClosedAt.Value:yyyy-MM-dd HH:mm}");
+                sb.AppendLine($"Status: {order.Status}");
+                sb.AppendLine($"Payment: {order.PaymentMethod}");
+            }
+
             sb.AppendLine("--------------------------------");
 
-            decimal total = 0;
+            int total = 0;
 
             foreach (var it in items)
             {
                 var productName = products.FirstOrDefault(p => p.Id == it.ProductId)?.Name ?? "Unknown";
                 total += it.LineTotal;
 
-                sb.AppendLine($"{productName}");
-                sb.AppendLine($"  {it.Quantity} x {it.UnitPrice:0.00} = {it.LineTotal:0.00}");
+                sb.AppendLine(productName);
+                sb.AppendLine($"  {it.Quantity} x {it.UnitPrice} MKD = {it.LineTotal} MKD");
             }
 
             sb.AppendLine("--------------------------------");
-            sb.AppendLine($"TOTAL: {total:0.00}");
+            sb.AppendLine($"TOTAL: {total} MKD");
             sb.AppendLine("--------------------------------");
 
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
@@ -150,7 +196,6 @@ namespace RestaurantPOS.Web.Controllers
 
             return File(bytes, "text/plain", fileName);
         }
-
 
         private OrderDetailsViewModel BuildOrderViewModel(RestaurantTable table)
         {
@@ -160,8 +205,8 @@ namespace RestaurantPOS.Web.Controllers
                 .Where(p => p.IsAvailable)
                 .ToList();
 
-            var waiters = _waiterService.GetAll()
-                .Where(w => w.IsActive)
+            var categories = _categoryService.GetAll()
+                .OrderBy(c => c.DisplayOrder)
                 .ToList();
 
             var vm = new OrderDetailsViewModel
@@ -169,13 +214,11 @@ namespace RestaurantPOS.Web.Controllers
                 TableId = table.Id,
                 TableNumber = table.TableNumber,
                 Products = products,
-                Waiters = waiters
-                    .Select(w => new SelectListItem
-                    {
-                        Value = w.Id.ToString(),
-                        Text = w.FullName
-                    })
-                    .ToList()
+                Categories = categories.Select(c => new CategoryFilterItem
+                {
+                    Id = c.Id,
+                    Name = c.Name
+                }).ToList()
             };
 
             if (openOrder != null)
@@ -184,25 +227,35 @@ namespace RestaurantPOS.Web.Controllers
 
                 var items = _orderService.GetItemsForOrder(openOrder.Id).ToList();
 
-                vm.Items = items
-                    .Select(i =>
+                vm.Items = items.Select(i =>
+                {
+                    var product = products.FirstOrDefault(p => p.Id == i.ProductId);
+                    return new OrderItemDisplay
                     {
-                        var product = products.FirstOrDefault(p => p.Id == i.ProductId);
-                        return new OrderItemDisplay
-                        {
-                            OrderItemId = i.Id,
-                            ProductName = product?.Name ?? "Unknown",
-                            Quantity = i.Quantity,
-                            UnitPrice = i.UnitPrice,
-                            LineTotal = i.LineTotal
-                        };
-                    })
-                    .ToList();
+                        OrderItemId = i.Id,
+                        ProductId = i.ProductId,
+                        ProductName = product?.Name ?? "Unknown",
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        LineTotal = i.LineTotal
+                    };
+                }).ToList();
 
                 vm.Total = vm.Items.Sum(x => x.LineTotal);
             }
 
             return vm;
+        }
+
+        private static string GetTableBadgeClass(TableStatus status)
+        {
+            return status switch
+            {
+                TableStatus.Free => "bg-success-lt",
+                TableStatus.Occupied => "bg-danger-lt",
+                TableStatus.Reserved => "bg-warning-lt",
+                _ => "bg-secondary-lt"
+            };
         }
     }
 }

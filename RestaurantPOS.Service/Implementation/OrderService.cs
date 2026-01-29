@@ -116,10 +116,21 @@ namespace RestaurantPOS.Service.Implementation
             }
         }
 
+        // 3B CHANGE:
+        // RemoveItem now DECREMENTS quantity by 1, and deletes only if quantity hits 0.
         public void RemoveItem(Guid orderItemId)
         {
             var item = _orderItemRepository.Get(orderItemId);
-            if (item != null)
+            if (item == null)
+                return;
+
+            if (item.Quantity > 1)
+            {
+                item.Quantity -= 1;
+                item.LineTotal = item.Quantity * item.UnitPrice;
+                _orderItemRepository.Update(item);
+            }
+            else
             {
                 _orderItemRepository.Delete(item);
             }
@@ -139,6 +150,27 @@ namespace RestaurantPOS.Service.Implementation
             order.TotalAmount = total;
             order.Status = OrderStatus.Closed;
             order.PaymentMethod = paymentMethod;
+            order.ClosedAt = DateTime.UtcNow;
+
+            _orderRepository.Update(order);
+
+            var table = _tableRepository.Get(order.RestaurantTableId);
+            if (table != null)
+            {
+                table.Status = TableStatus.Free;
+                _tableRepository.Update(table);
+            }
+        }
+
+        public void CancelOrder(Guid orderId)
+        {
+            var order = _orderRepository.Get(orderId);
+            if (order == null)
+                return;
+
+            order.Status = OrderStatus.Cancelled;
+            order.PaymentMethod = PaymentMethod.Unknown;
+            order.TotalAmount = 0;
             order.ClosedAt = DateTime.UtcNow;
 
             _orderRepository.Update(order);

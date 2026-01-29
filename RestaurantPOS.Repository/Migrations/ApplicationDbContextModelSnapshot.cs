@@ -190,6 +190,9 @@ namespace RestaurantPOS.Repository.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsManager")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("PinCode")
                         .IsRequired()
                         .HasColumnType("TEXT");

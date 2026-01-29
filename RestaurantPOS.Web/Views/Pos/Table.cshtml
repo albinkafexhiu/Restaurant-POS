@@ -2,8 +2,8 @@
 @using RestaurantPOS.Domain.Enums
 
 @{
-    ViewData["Title"] = $"Table {Model.TableNumber}";
-    Layout = "_PosLayout";
+ViewData["Title"] = $"Table {Model.TableNumber}";
+Layout = "_PosLayout";
 }
 
 <div class="page-header d-print-none">
@@ -23,188 +23,253 @@
 
 @if (!Model.HasOpenOrder)
 {
-    <div class="row">
-        <div class="col-lg-6 col-xl-5">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Start order</h3>
+<div class="row">
+    <div class="col-lg-6 col-xl-5">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Start order</h3>
+            </div>
+            <div class="card-body">
+                <div class="text-muted mb-3">
+                    No open order for this table. Click start to begin (assigned to logged-in waiter).
                 </div>
-                <div class="card-body">
-                    <div class="text-muted mb-3">
-                        No open order for this table. Select a waiter and start a new order.
-                    </div>
 
-                    <form asp-action="StartOrder" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="tableId" value="@Model.TableId" />
+                <form asp-action="StartOrder" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tableId" value="@Model.TableId" />
 
-                        <div class="mb-3">
-                            <label class="form-label">Waiter</label>
-                            <select name="waiterId" class="form-select">
-                                <option value="">-- select waiter --</option>
-                                @foreach (var w in Model.Waiters)
-                                {
-                                    <option value="@w.Value">@w.Text</option>
-                                }
-                            </select>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="ti ti-playstation-circle"></i>
-                            Start Order
-                        </button>
-                    </form>
-                </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-playstation-circle"></i>
+                        Start Order
+                    </button>
+                </form>
             </div>
         </div>
     </div>
+</div>
 }
 else
 {
-    <div class="row g-3">
-        <!-- LEFT: PRODUCTS -->
-        <div class="col-lg-8">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Products</h3>
-                    <div class="ms-auto text-muted small">Tap to add</div>
+<div class="row g-3">
+    <!-- LEFT: PRODUCTS -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Products</h3>
+                <div class="ms-auto text-muted small">Tap to add</div>
+            </div>
+
+            <div class="card-body">
+
+                <!-- Search -->
+                <div class="mb-3">
+                    <input id="productSearch"
+                           type="text"
+                           class="form-control"
+                           placeholder="Search products..." />
                 </div>
 
-                <div class="card-body">
-                    <div class="row g-2" id="productsGrid">
-                        @foreach (var p in Model.Products)
+                <!-- Category pills -->
+                <div class="mb-3">
+                    <div class="btn-list">
+                        <button type="button" class="btn btn-sm btn-primary" data-cat="all">All</button>
+                        @foreach (var c in Model.Categories)
                         {
-                            <div class="col-6 col-md-4 col-xl-3">
-                                <form asp-action="AddItem" method="post" class="h-100">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="tableId" value="@Model.TableId" />
-                                    <input type="hidden" name="orderId" value="@Model.OrderId" />
-                                    <input type="hidden" name="productId" value="@p.Id" />
-                                    <input type="hidden" name="quantity" value="1" />
-
-                                    <button type="submit" class="card card-sm h-100 w-100 btn btn-light">
-                                        <div class="card-body text-center">
-                                            <div class="fw-bold text-truncate">@p.Name</div>
-                                            <div class="text-muted small">@p.Price</div>
-                                        </div>
-                                    </button>
-                                </form>
-                            </div>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary"
+                                data-cat="@c.Id">
+                            @c.Name
+                        </button>
                         }
                     </div>
-
-                    <hr class="my-3" />
-
-                    <!-- Optional: manual add with quantity (keeps your old capability) -->
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-7">
-                            <label class="form-label">Add with quantity</label>
-                            <select id="productSelect" class="form-select">
-                                <option value="">-- select product --</option>
-                                @foreach (var p in Model.Products)
-                                {
-                                    <option value="@p.Id">@p.Name (@p.Price)</option>
-                                }
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Qty</label>
-                            <input id="qtyInput" type="number" value="1" min="1" class="form-control" />
-                        </div>
-                        <div class="col-md-2">
-                            <form asp-action="AddItem" method="post" id="manualAddForm">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="tableId" value="@Model.TableId" />
-                                <input type="hidden" name="orderId" value="@Model.OrderId" />
-                                <input type="hidden" name="productId" id="manualProductId" />
-                                <input type="hidden" name="quantity" id="manualQty" />
-
-                                <button type="submit" class="btn btn-primary w-100">
-                                    Add
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- RIGHT: RECEIPT -->
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Receipt</h3>
                 </div>
 
-                <div class="card-body">
-                    @if (Model.Items.Any())
+                <!-- Products grid -->
+                <div class="row g-2" id="productsGrid">
+                    @foreach (var p in Model.Products)
                     {
-                        <div class="list-group list-group-flush">
-                            @foreach (var item in Model.Items)
-                            {
-                                <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div class="me-2">
-                                            <div class="fw-bold">@item.ProductName</div>
-                                            <div class="text-muted small">
-                                                @item.Quantity × @item.UnitPrice
-                                            </div>
-                                        </div>
+                    <div class="col-6 col-md-4 col-xl-3 product-card"
+                         data-name="@p.Name.ToLower()"
+                         data-cat="@p.ProductCategoryId">
+                        <form asp-action="AddItem" method="post" class="h-100">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tableId" value="@Model.TableId" />
+                            <input type="hidden" name="orderId" value="@Model.OrderId" />
+                            <input type="hidden" name="productId" value="@p.Id" />
+                            <input type="hidden" name="quantity" value="1" />
 
-                                        <div class="text-end">
-                                            <div class="fw-bold">@item.LineTotal</div>
-                                            <form asp-action="RemoveItem" method="post" class="mt-1">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="tableId" value="@Model.TableId" />
-                                                <input type="hidden" name="orderItemId" value="@item.OrderItemId" />
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    Remove
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </div>
+                            <button type="submit" class="card card-sm h-100 w-100 btn btn-light">
+                                <div class="card-body text-center">
+                                    <div class="fw-bold text-truncate">@p.Name</div>
+                                    <div class="text-muted small">@p.Price MKD</div>
                                 </div>
-                            }
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-muted">No items in this order yet.</div>
-                    }
-                </div>
-
-                <div class="card-footer">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="text-muted">Total</div>
-                        <div class="h3 m-0">@Model.Total</div>
+                            </button>
+                        </form>
                     </div>
-
-                    
-                    <form asp-action="CloseOrder" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="tableId" value="@Model.TableId" />
-                        <input type="hidden" name="orderId" value="@Model.OrderId" />
-
-                        <div class="mb-2">
-                            <label class="form-label">Payment method</label>
-                            <select name="paymentMethod" class="form-select">
-                                <option value="@PaymentMethod.Cash">Cash</option>
-                                <option value="@PaymentMethod.Card">Card</option>
-                                <option value="@PaymentMethod.Other">Other</option>
-                            </select>
-                        </div>
-
-                        <button type="submit" class="btn btn-success w-100">
-                            <i class="ti ti-check"></i>
-                            Close Order
-                        </button>
-                    </form>
+                    }
                 </div>
+
+                <hr class="my-3" />
+
+                <!-- Manual add with quantity -->
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label">Add with quantity</label>
+                        <select id="productSelect" class="form-select">
+                            <option value="">-- select product --</option>
+                            @foreach (var p in Model.Products)
+                            {
+                            <option value="@p.Id">@p.Name (@p.Price MKD)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Qty</label>
+                        <input id="qtyInput" type="number" value="1" min="1" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <form asp-action="AddItem" method="post" id="manualAddForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tableId" value="@Model.TableId" />
+                            <input type="hidden" name="orderId" value="@Model.OrderId" />
+                            <input type="hidden" name="productId" id="manualProductId" />
+                            <input type="hidden" name="quantity" id="manualQty" />
+
+                            <button type="submit" class="btn btn-primary w-100">
+                                Add
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
             </div>
         </div>
-
     </div>
+
+    <!-- RIGHT: RECEIPT -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Receipt</h3>
+            </div>
+
+            <div class="card-body">
+                @if (Model.Items.Any())
+                {
+                <div class="list-group list-group-flush">
+                    @foreach (var item in Model.Items)
+                    {
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="me-2">
+                                <div class="fw-bold">@item.ProductName</div>
+                                <div class="text-muted small">
+                                    @item.Quantity × @item.UnitPrice MKD
+                                </div>
+
+                                <div class="btn-group btn-group-sm mt-2" role="group">
+                                    <!-- Decrement -->
+                                    <form asp-action="RemoveItem" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tableId" value="@Model.TableId" />
+                                        <input type="hidden" name="orderItemId" value="@item.OrderItemId" />
+                                        <button type="submit" class="btn btn-outline-secondary">−</button>
+                                    </form>
+
+                                    <!-- Increment -->
+                                    <form asp-action="AddItem" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="tableId" value="@Model.TableId" />
+                                        <input type="hidden" name="orderId" value="@Model.OrderId" />
+                                        <input type="hidden" name="productId" value="@item.ProductId" />
+                                        <input type="hidden" name="quantity" value="1" />
+                                        <button type="submit" class="btn btn-outline-secondary">+</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="text-end">
+                                <div class="fw-bold">@item.LineTotal MKD</div>
+                            </div>
+                        </div>
+                    </div>
+                    }
+                </div>
+                }
+                else
+                {
+                <div class="text-muted">No items in this order yet.</div>
+                }
+            </div>
+
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-muted">Total</div>
+                    <div class="h3 m-0">@Model.Total MKD</div>
+                </div>
+
+                <!-- Hidden iframe for download -->
+                <iframe name="receiptFrame" style="display:none;"></iframe>
+
+                <!-- Print receipt -->
+                <form asp-action="PrintReceipt" method="post" target="receiptFrame" id="printForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tableId" value="@Model.TableId" />
+                    <input type="hidden" name="orderId" value="@Model.OrderId" />
+
+                    <div class="mb-2">
+                        <label class="form-label">Payment method</label>
+                        <select name="paymentMethod" class="form-select">
+                            <option value="@PaymentMethod.Cash">Cash</option>
+                            <option value="@PaymentMethod.Card">Card</option>
+                            <option value="@PaymentMethod.Other">Other</option>
+                        </select>
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-success w-100"
+                            @(Model.Items.Any() ? "" : "disabled")>
+                        <i class="ti ti-printer"></i>
+                        Print Receipt
+                    </button>
+                </form>
+
+                <!-- Cancel order (modal) -->
+                <button type="button" class="btn btn-outline-danger w-100 mt-2" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                    <i class="ti ti-x"></i>
+                    Cancel Order
+                </button>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Cancel confirmation modal -->
+<div class="modal modal-blur fade" id="cancelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cancel Order?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                This will cancel the order and free the table.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal">No</button>
+
+                <form asp-action="CancelOrder" method="post" class="w-100">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="tableId" value="@Model.TableId" />
+                    <input type="hidden" name="orderId" value="@Model.OrderId" />
+                    <button type="submit" class="btn btn-danger w-100">Yes, cancel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 }
 
 @section Scripts {
@@ -230,5 +295,59 @@ else
             manualQty.value = qty && parseInt(qty) > 0 ? qty : 1;
         });
     }
+
+    // After printing, redirect to tables
+    const printForm = document.getElementById("printForm");
+    if (printForm) {
+        printForm.addEventListener("submit", function () {
+            setTimeout(function () {
+                window.location.href = "@Url.Action("Index", "Pos")";
+            }, 300);
+        });
+    }
+
+    // Category + search filtering
+    let selectedCat = "all";
+
+    const searchInput = document.getElementById("productSearch");
+    const productCards = Array.from(document.querySelectorAll(".product-card"));
+    const catButtons = Array.from(document.querySelectorAll("[data-cat]"));
+
+    function applyFilter() {
+        const term = (searchInput?.value || "").trim().toLowerCase();
+
+        productCards.forEach(card => {
+            const name = card.getAttribute("data-name") || "";
+            const cat = card.getAttribute("data-cat") || "";
+
+            const matchesSearch = !term || name.includes(term);
+            const matchesCat = (selectedCat === "all") || (cat === selectedCat);
+
+            card.style.display = (matchesSearch && matchesCat) ? "" : "none";
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener("input", applyFilter);
+    }
+
+    catButtons.forEach(btn => {
+        btn.addEventListener("click", function () {
+            selectedCat = btn.getAttribute("data-cat") || "all";
+
+            // button active styling
+            catButtons.forEach(b => {
+                b.classList.remove("btn-primary");
+                b.classList.add("btn-outline-primary");
+            });
+
+            btn.classList.remove("btn-outline-primary");
+            btn.classList.add("btn-primary");
+
+            applyFilter();
+        });
+    });
+
+    applyFilter();
 </script>
 }

@@ -40,12 +40,19 @@
                         <input name="pin" type="password" class="form-control" placeholder="****" autofocus />
                     </div>
 
-                    <div class="form-footer">
-                        <button type="submit" class="btn btn-primary w-100">
-                            Login
+                    <input type="hidden" name="mode" id="modeInput" value="waiter" />
+
+                    <div class="form-footer d-grid gap-2">
+                        <button type="submit" class="btn btn-primary w-100" onclick="document.getElementById('modeInput').value='waiter'">
+                            Login as Waiter
+                        </button>
+
+                        <button type="submit" class="btn btn-outline-primary w-100" onclick="document.getElementById('modeInput').value='manager'">
+                            Login as Manager
                         </button>
                     </div>
                 </form>
+
             </div>
         </div>
 

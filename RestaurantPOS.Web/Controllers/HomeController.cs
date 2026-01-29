@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using RestaurantPOS.Web.Infrastructure;
 using RestaurantPOS.Web.Models;
 
 namespace RestaurantPOS.Web.Controllers;
 
+[AdminAuthorize]
 public class HomeController : Controller
 {
     public IActionResult Index()

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using RestaurantPOS.Domain.Entities;
 using RestaurantPOS.Service.Interfaces;
+using RestaurantPOS.Web.Infrastructure;
 
 namespace RestaurantPOS.Web.Controllers
 {
+    [AdminAuthorize]
     public class WaitersController : Controller
     {
         private readonly IWaiterService _waiterService;

@@ -46,7 +46,14 @@ namespace RestaurantPOS.Service.Implementation
         {
             return _waiterRepository
                 .GetAll()
-                .FirstOrDefault(w => w.PinCode == pinCode && w.IsActive);
+                .FirstOrDefault(w => w.PinCode == pinCode && w.IsActive && !w.IsManager);
+        }
+
+        public Waiter? LoginManagerWithPin(string pinCode)
+        {
+            return _waiterRepository
+                .GetAll()
+                .FirstOrDefault(w => w.PinCode == pinCode && w.IsActive && w.IsManager);
         }
     }
 }

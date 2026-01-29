@@ -4,5 +4,6 @@ namespace RestaurantPOS.Web.Infrastructure
     {
         public const string WaiterId = "WaiterId";
         public const string WaiterName = "WaiterName";
+        public const string IsManager = "IsManager";
     }
 }

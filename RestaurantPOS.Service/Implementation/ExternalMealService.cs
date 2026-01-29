@@ -21,40 +21,80 @@ namespace RestaurantPOS.Service.Implementation
             for (int i = 0; i < count; i++)
             {
                 var response = await _httpClient.GetAsync("api/json/v1/1/random.php");
-                if (!response.IsSuccessStatusCode)
-                {
-                    continue;
-                }
+                if (!response.IsSuccessStatusCode) continue;
 
                 var json = await response.Content.ReadAsStringAsync();
-
-                var data = JsonSerializer.Deserialize<TheMealDbResponse>(json,
-                    new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                var data = Deserialize(json);
 
                 var meal = data?.Meals?.FirstOrDefault();
-                if (meal == null)
-                {
-                    continue;
-                }
+                if (meal == null) continue;
 
-                var ingredients = ExtractIngredients(meal);
-
-                var dto = new ExternalMealDto
-                {
-                    Name = meal.strMeal ?? string.Empty,
-                    Category = meal.strCategory ?? string.Empty,
-                    Area = meal.strArea ?? string.Empty,
-                    ShortInstructions = BuildShortInstructions(meal.strInstructions),
-                    Ingredients = ingredients
-                };
-
-                result.Add(dto);
+                result.Add(MapToDto(meal));
             }
 
             return result;
+        }
+
+        public async Task<List<ExternalMealDto>> SearchMealsAsync(string query)
+        {
+            query = (query ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<ExternalMealDto>();
+
+            var response = await _httpClient.GetAsync($"api/json/v1/1/search.php?s={Uri.EscapeDataString(query)}");
+            if (!response.IsSuccessStatusCode)
+                return new List<ExternalMealDto>();
+
+            var json = await response.Content.ReadAsStringAsync();
+            var data = Deserialize(json);
+
+            if (data?.Meals == null || data.Meals.Count == 0)
+                return new List<ExternalMealDto>();
+
+            // return a clean list for UI
+            return data.Meals
+                .Where(m => !string.IsNullOrWhiteSpace(m.idMeal))
+                .Select(MapToDto)
+                .ToList();
+        }
+
+        public async Task<ExternalMealDto?> GetMealByIdAsync(string mealId)
+        {
+            mealId = (mealId ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(mealId))
+                return null;
+
+            var response = await _httpClient.GetAsync($"api/json/v1/1/lookup.php?i={Uri.EscapeDataString(mealId)}");
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            var data = Deserialize(json);
+
+            var meal = data?.Meals?.FirstOrDefault();
+            if (meal == null)
+                return null;
+
+            return MapToDto(meal);
+        }
+
+        private static TheMealDbResponse? Deserialize(string json)
+        {
+            return JsonSerializer.Deserialize<TheMealDbResponse>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+
+        private static ExternalMealDto MapToDto(MealItem meal)
+        {
+            return new ExternalMealDto
+            {
+                ExternalId = meal.idMeal ?? string.Empty,
+                Name = meal.strMeal ?? string.Empty,
+                Category = meal.strCategory ?? string.Empty,
+                Area = meal.strArea ?? string.Empty,
+                ShortInstructions = BuildShortInstructions(meal.strInstructions),
+                Ingredients = ExtractIngredients(meal)
+            };
         }
 
         private static List<string> ExtractIngredients(MealItem meal)
@@ -96,6 +136,7 @@ namespace RestaurantPOS.Service.Implementation
 
         private class MealItem
         {
+            public string? idMeal { get; set; }
             public string? strMeal { get; set; }
             public string? strCategory { get; set; }
             public string? strArea { get; set; }

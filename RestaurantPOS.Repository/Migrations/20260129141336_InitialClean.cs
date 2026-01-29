@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace RestaurantPOS.Repository.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialClean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -60,7 +60,8 @@ namespace RestaurantPOS.Repository.Migrations
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     FullName = table.Column<string>(type: "TEXT", nullable: false),
                     PinCode = table.Column<string>(type: "TEXT", nullable: false),
-                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false)
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsManager = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {

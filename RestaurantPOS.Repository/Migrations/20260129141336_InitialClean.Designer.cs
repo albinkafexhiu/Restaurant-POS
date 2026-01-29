@@ -11,8 +11,8 @@ using RestaurantPOS.Repository.Data;
 namespace RestaurantPOS.Repository.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260128193640_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260129141336_InitialClean")]
+    partial class InitialClean
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -191,6 +191,9 @@ namespace RestaurantPOS.Repository.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsManager")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("PinCode")
